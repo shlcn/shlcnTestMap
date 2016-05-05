@@ -1,0 +1,392 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no, width=device-width">
+    <script type="text/javascript" src="http://webapi.amap.com/maps?v=1.3&key=da6af78b4d4103d669a1123ae068bf3e"></script>
+    <script type="text/javascript" src="http://cache.amap.com/lbs/static/addToolbar.js"></script>
+    <script src="Scripts/jquery-1.10.2.js" type="text/javascript"></script>
+    <style type="text/css">
+        #container {
+            width: 330px;
+            height: 280px;
+        }
+
+        #tip {
+            height: 20px;
+            background-color: #fff;
+            padding-left: 5px;
+            padding-right: 5px;
+            border: 1px solid #969696;
+            position: absolute;
+            font-size: 12px;
+            right: 5px;
+            top: 380px;
+            border-radius: 2px;
+            line-height: 20px;
+        }
+
+        #tipMsg {
+            height: 20px;
+            background-color: #fff;
+            padding-left: 5px;
+            padding-right: 5px;
+            border: 1px solid #969696;
+            position: absolute;
+            font-size: 12px;
+            right: 5px;
+            top: 400px;
+            border-radius: 2px;
+            line-height: 20px;
+        }
+    </style>
+    <title>高德地图JS API Demo</title>
+</head>
+<body>
+    <input type="button" id="btnOpenApp" value="打开高德应用" onclick="OpenAMapAPP2();" />
+    <input type="button" id="btnCheckSystemBrower" value="查看浏览器及系统" onclick="CheckSystemBrower();" />
+    <input type="button" value="定位" onclick="GetCurrentPosition();" /><input type="button" value="监控" onclick="    WatchPosition();" />
+    <input type="button" value="当前级别" onclick="GetZoomLevel();" />
+    <br />
+    当前经度<input type="text" id="txtLng" />
+    <br />
+    当前纬度<input type="text" id="txtLat" />
+    <br />
+    地理位置<input type="text" id="txtAddress" />
+
+    <!--地图容器--->
+    <div id="container"></div>
+    <!--地图容器--->
+
+    <!--地图上面的注释--->
+    <div id="tip">
+        <div id="info">初始化加载地图时，center及level属性缺省，地图默认显示用户所在城市范围</div>
+    </div>
+    <div id="tipMsg">
+        <div id="infoMsg"></div>
+    </div>
+    <!--地图上面的注释--->
+
+</body>
+</html>
+<script type="text/javascript">
+
+    var myLng = "";//当前坐标的经度
+    var myLat = "";//当前坐标的纬度
+
+    //经纬度：舞东风 104.087738    30.615476
+
+    var zoomToAccuracyFlag = true;//是否需要缩放到合适的视野级别 true：为需要 false：不需要
+
+    //创建地图
+    //var map = new AMap.Map('container');//直接创建一个地图
+    ////初始化加载地图时，若center及level属性缺省，地图默认显示用户当前城市范围
+    var map = new AMap.Map('container', {
+        zoom: 10,
+        resizeEnable: true //是否监控地图容器尺寸变化，默认值为false
+        //center: [116.39, 39.9]
+    });
+
+    //地图中添加地图操作ToolBar插件
+    map.plugin(['AMap.ToolBar'], function () {
+        //设置地位标记为自定义标记
+        var toolBar = new AMap.ToolBar();
+        map.addControl(toolBar);
+    });
+
+    //浏览器定位
+    var geolocation;
+    map.plugin('AMap.Geolocation', function () {
+        geolocation = new AMap.Geolocation({
+            enableHighAccuracy: true,//是否使用高精度定位，默认:true
+            //timeout: 10000,          //超过10秒后停止定位，默认：无穷大
+            maximumAge: 3,           //定位结果缓存0毫秒，默认：0
+            buttonOffset: new AMap.Pixel(0, 0),//定位按钮与设置的停靠位置的偏移量，默认：Pixel(10, 20)
+            zoomToAccuracy: zoomToAccuracyFlag,      //定位成功后调整地图视野范围使定位位置及精度范围视野内可见，默认：false 设置为false之后，不会自动调整缩放级别
+            buttonPosition: 'RB'        ////定位按钮停靠位置，默认：'LB'，左下角  'RB',右下角
+        });
+        map.addControl(geolocation);
+        //geolocation.getCurrentPosition();//执行 获取当前位置信息
+        //WatchPosition();
+        AMap.event.addListener(geolocation, 'complete', onComplete);//返回定位信息 并调用 onComplete(data)
+        AMap.event.addListener(geolocation, 'error', onError);      //返回定位出错信息 并调用 onError(data)
+
+        zoomToAccuracyFlag = false;
+    });
+
+    //解析定位结果
+    function onComplete(data) {
+
+        //alert("定位成功");
+        var str = ['定位成功'];
+        str.push('经度：' + data.position.getLng());
+        str.push('纬度：' + data.position.getLat());
+        str.push('精度：' + data.accuracy + ' 米');
+        str.push('方向度数：' + navigator.geolocation.coords.heading);
+        str.push('是否经过偏移：' + (data.isConverted ? '是' : '否'));
+        str.push('地图视野级别：' + map.getZoom());
+        document.getElementById('infoMsg').innerHTML = str.join('<br>');
+
+        myLng = data.position.getLng();//当前坐标的经度
+        myLat = data.position.getLat();//当前坐标的纬度
+
+        SetLngLat(myLng, myLat);
+    }
+    //解析定位错误信息
+    function onError(data) {
+        document.getElementById('infoMsg').innerHTML = '定位失败';
+    }
+
+    //设置经纬度到页面的文本框
+    function SetLngLat(_lng, _lat) {
+        $("#txtLng").val(_lng);
+        $("#txtLat").val(_lat);
+
+        var _address = "";
+        AMap.service(["AMap.Geocoder"], function () { //加载地理编码
+            geocoder = new AMap.Geocoder({
+                radius: 1000,
+                extensions: "all"
+            });
+            //步骤三：通过服务对应的方法回调服务返回结果，本例中通过逆地理编码方法getAddress回调结果
+            geocoder.getAddress(new AMap.LngLat(_lng, _lat), function (status, result) {
+                //根据服务请求状态处理返回结果
+                if (status == 'error') {
+                    alert("服务请求出错啦！ ");
+                }
+                if (status == 'no_data') {
+                    alert("无数据返回，请换个关键字试试～～");
+                }
+                else {
+                    _address = result.regeocode.formattedAddress;
+                    $("#txtAddress").val(_address);
+                }
+            });
+        });
+
+        //var _LngLat=AMap.Pixel(_lng,_lat);
+        //alert(_address);
+    }
+
+    //定位
+    function GetCurrentPosition() {
+        zoomToAccuracyFlag = true;
+        geolocation.getCurrentPosition();//执行 获取当前位置信息
+    }
+
+    /*
+	*监控当前位置并获取当前位置信息
+	*/
+    function WatchPosition() {
+        zoomToAccuracyFlag = true;
+        geolocation.watchPosition();
+        //geolocation.setFitView();
+    };
+
+    //var lnglatXY = AMap.LngLat(myLng, myLat)  //已知点坐标
+    //function regeocoder() {  //逆地理编码
+    //    var geocoder = new AMap.Geocoder({
+    //        radius: 1000,
+    //        extensions: "all"
+    //    });
+    //    geocoder.getAddress(lnglatXY, function (status, result) {
+    //        if (status === 'complete' && result.info === 'OK') {
+    //            geocoder_CallBack(result);
+    //        }
+    //    });
+    //    var marker = new AMap.Marker({  //加点
+    //        map: map,
+    //        position: lnglatXY
+    //    });
+    //    map.setFitView();
+    //}
+    //function geocoder_CallBack(data) {
+    //    var address = data.regeocode.formattedAddress; //返回地址描述
+    //    document.getElementById("result").innerHTML = address;
+    //}
+
+    //获取当前地图视野级别
+    function GetZoomLevel() {
+        alert(map.getZoom());
+    }
+    //获取单击事件地图上的点的坐标
+    map.on('click', function (e) {
+        alert('您在[ ' + e.lnglat.getLng() + ',' + e.lnglat.getLat() + ' ]的位置点击了地图！');
+        //设置经纬度到页面的文本框
+        SetLngLat(e.lnglat.getLng(), e.lnglat.getLat());
+    });
+    //获取到当前坐标经纬度以及需要去的地方的经纬度之后，进行导航操作;
+    //function DH() {
+    //    var walking = new BMap.WalkingRoute(map, { renderOptions: { map: map, panel: "r-result", autoViewport: true } });
+    //    //search(start:String|Point|LocalResultPoi,end:String|Point|LocalResultPoi) 
+    //    //发起检索 start: 起点，参数可以是关键字、坐标点（自1.1 版本支持）或者 LocalSearchPoi 实例。 end: 终 点，参数可以是关键字、坐标点（自1.1版本支 持）或者 LocalSearchPoi 实例
+    //    walking.search(new BMap.Point(parseFloat(myLng), parseFloat(myLat)), new BMap.Point(104.087738, 30.615476));//开始位置 结束位置
+    //}
+</script>
+<script type="text/javascript">
+
+    //网页上的按钮打开移动端本地的高德地图应用
+    function OpenAMapAPP1() {
+        var androidAMAppURL = "androidamap://arroundpoi?keywords=银行|加油站|电影院&dev=0";//"androidamap://rootmap";//测试调用高德地图主图
+        var iOSAMAppURL = "iosamap://rootmap";//测试调用高德地图主图
+        var androidAppMarketURL = "http://mapdownload.autonavi.com/mobileapk/Amap_Android_V7.6.0.2058_GuanWang.apk";
+        var iOSAppMarketURL = "https://itunes.apple.com/app/id461703208?ls=1&mt=8";
+
+        //alert("准备开始打开高德APP");
+        //本地应用的URL 
+        var _appLocalURL = "";
+        //相应的下载URL
+        var _appMarketURL = "";
+
+        //_appLocalURL = "androidscitclub://mainapp";
+        //_appLocalURL = "androidamap://arroundpoi?keywords=银行|加油站|电影院&dev=0";
+
+        
+        //通过判断得到相应的打开本地应用的URL以及相应的下载URL
+        //if (IsWeChatBrower()) {
+        //    alert("微信内置浏览器不支持打开本地应用，请点击右上角使用本地浏览器打开");
+        //}
+        //else {
+        //    if (IsAndroid()) {
+        //        alert("安卓端非微信浏览器");
+        //        _appLocalURL = androidAMAppURL;
+        //        _appMarketURL = androidAppMarketURL;
+        //    }
+        //    else if (IsiOS()) {
+        //        alert("iOS端非微信浏览器");
+        //        _appLocalURL = iOSAMAppURL;
+        //        _appMarketURL = iOSAppMarketURL;
+        //    }
+        //}
+        //alert("安卓端非微信浏览器");
+        _appLocalURL = androidAMAppURL;
+        _appMarketURL = androidAppMarketURL;
+
+        //打开或者跳到指定的下载URL
+        window.location = _appLocalURL;//打开某手机上的某个app应用
+        setTimeout(function () {
+            alert("开始下载 _appMarketURL=" + _appMarketURL);
+            window.location = _appMarketURL;//如果超时就跳转到app下载页
+        }, 1000);
+    }
+
+
+</script>
+<script type="text/javascript">
+    //此处目前仅判断Android iOS系统，以及是否为相应的微信浏览器
+    //是否是安卓系统
+    function IsAndroid() {
+        if (/android/i.test(navigator.userAgent)) {
+            //alert("This is Android'browser.这是Android平台下浏览器");
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+    //是否是iOS系统
+    function IsiOS() {
+        if (/(iPhone|iPad|iPod|iOS)/i.test(navigator.userAgent)) {
+            //alert("This is iOS'browser.这是iOS平台下浏览器");
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+    //是否是微信浏览器
+    function IsWeChatBrower() {
+        if (/MicroMessenger/i.test(navigator.userAgent)) {
+            //alert("This is MicroMessenger'browser.这是微信平台下浏览器");
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+</script>
+<script type="text/javascript">
+    //网页上的按钮打开移动端本地的高德地图应用
+    function OpenAMapAPP2() {
+        alert("准备开始打开高德APP");
+        //appURL
+        var _appLocalURL = "";
+        //_appLocalURL = "androidscitclub://mainapp";
+        _appLocalURL = "androidamap://arroundpoi?keywords=银行|加油站|电影院&dev=0";
+
+        //var the_href = $(".down_app").attr("href");//获得下载链接
+        window.location = _appLocalURL;//打开某手机上的某个app应用
+        
+        setTimeout(function () {
+            alert("sss");
+            //window.location = the_href;//如果超时就跳转到app下载页
+        }, 1000);
+        
+    }
+
+    var androidAppMarketURL = "";
+    var iOSAppMarketURL = "";
+    var openApp = function () {
+        var btnOpenApp = document.getElementById("btnOpenApp");
+        btnOpenApp.onclick = function () {
+            //打开本地应用函数
+            var open = function (url) {
+                var timeout;
+                function try_to_open_app() {
+                    timeout = setTimeout(function () {
+                        window.location.href = url;
+                        console.log(22)
+                    }, 10);
+                }
+                try_to_open_app();
+            }
+
+            if (/android/i.test(navigator.userAgent)) {
+                alert("This is Android'browser.这是Android平台下浏览器。");//这是Android平台下浏览器
+                if (/MicroMessenger/i.test(navigator.userAgent)) {
+                    alert("This is MicroMessenger browser，这是微信平台下浏览器，请使用本地浏览器打开");//这是微信平台下浏览器
+                }
+                else {
+                    open(androidAppMarketURL);
+                }
+            }
+
+            if (/(iPhone|iPad|iPod|iOS)/i.test(navigator.userAgent)) {
+                alert("This is iOS'browser.这是iOS平台下浏览器。");//这是iOS平台下浏览器
+                if (/MicroMessenger/i.test(navigator.userAgent)) {
+                    alert("微信内置浏览器不支持打开本地应用，这是iOS微信平台下浏览器，请点击右上角使用本地浏览器打开");//这是微信平台下浏览器
+                }
+                else {
+                    open(iOSAppMarketURL);
+                }
+            }
+        };
+    }
+</script>
+<script type="text/javascript">
+    //手机端判断各个平台浏览器及操作系统平台
+    function CheckSystemBrower() {
+        if (/android/i.test(navigator.userAgent)) {
+            alert("This is Android'browser.这是Android平台下浏览器");//这是Android平台下浏览器
+        }
+        if (/(iPhone|iPad|iPod|iOS)/i.test(navigator.userAgent)) {
+            alert("This is iOS'browser.这是iOS平台下浏览器");//这是iOS平台下浏览器
+        }
+        if (/Linux/i.test(navigator.userAgent)) {
+            alert("This is Linux'browser.这是Linux平台下浏览器");//这是Linux平台下浏览器
+        }
+        if (/Linux/i.test(navigator.platform)) {
+            alert("This is Linux operating system.这是Linux操作系统平台");//这是Linux操作系统平台
+        }
+        if (/MicroMessenger/i.test(navigator.userAgent)) {
+            alert("This is MicroMessenger'browser.这是微信平台下浏览器");//这是微信平台下浏览器
+        }
+        //document.write("<br /><br /><br /><br /><br /><br />");
+        //document.write("navigator.userAgent:" + navigator.userAgent);
+    }
+    function Check() {
+        //alert("navigator.platform:" + navigator.platform);
+        checkPlatform();
+    }
+</script>
